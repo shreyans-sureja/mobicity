@@ -6,6 +6,8 @@ from django.http import JsonResponse
 from django.contrib.auth import get_user_model
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth import login, logout
+from django.http import HttpResponse
+
 
 import re
 import random
@@ -22,7 +24,7 @@ def signin(request):
     username = request.POST['email']
     password = request.POST['password']
 
-    if not re.match("^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$",username):
+    if not re.match("^[\w\.\+\-]+\@[\w]+\.[a-z]{2,3}$", username):
         return JsonResponse({'error' : 'Enter a valid email'})
 
     if len(password) < 3:
