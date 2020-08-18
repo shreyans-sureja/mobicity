@@ -20,6 +20,9 @@ def add(request,id,token):
     if not validate_user_session(id,token):
         return JsonResponse({'error' : 'Please re-login', 'code' : '500'})
 
+    print("POINNTTTTTT 11111111")
+    print(request.POST)
+
     if request.method == "POST":
         user_id = id
         transaction_id = request.POST['transaction_id']
