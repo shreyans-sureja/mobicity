@@ -7,7 +7,6 @@ from django.http import JsonResponse, HttpResponse
 from django.contrib.auth import get_user_model
 from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
-from django.contrib.auth.decorators import login_required
 
 class PaymentCardsViewSet(viewsets.ModelViewSet):
     queryset = PaymentCards.objects.all().order_by('number')
@@ -49,9 +48,13 @@ def get_card(request,id,token):
     try:
         user = UserModel.objects.get(pk=id)
         card = PaymentCards.objects.filter(user=user).values().first()
-        return JsonResponse({"card": card})
+
+        if card is not None:
+            return JsonResponse({"card": card})
     except:
-        return JsonResponse({"card" : {}},status=404)
+        pass
+
+    return JsonResponse({"card" : {}},status=404)
 
 def generate_token(obj,session_token):
 
@@ -113,7 +116,6 @@ def generate_token(obj,session_token):
     print(response.text.encode('utf8'))
     return None
 
-
 def make_payment(obj,token,client_token):
     url = "https://api.test.paysafe.com/paymenthub/v1/payments"
     headers = {
@@ -134,6 +136,20 @@ def make_payment(obj,token,client_token):
     response = requests.request("POST", url, headers=headers, data=payload)
     return response
 
+def save_card(obj,id):
+    UserModel = get_user_model()
+    try:
+        user = UserModel.objects.get(pk=id)
+        card = PaymentCards()
+        card.number = obj['cardNum']
+        card.expiry_month = obj['expiry_month']
+        card.expiry_year = obj['expiry_year']
+        card.name = obj['name']
+        card.user = user
+        card.save()
+        print(card)
+    except:
+        print("card not saved successfully")
 
 @csrf_exempt
 def pay(request,id,token):
@@ -143,21 +159,25 @@ def pay(request,id,token):
     if not request.method == 'POST':
         return JsonResponse({'error': 'Send a post request with valid parameter only'},status=400)
 
-    UserModel = get_user_model()
-    user = UserModel.objects.get(pk=id)
+    expiry = request.POST['expiry'].split('/')
+    expiry_month = expiry[0]
+    expiry_year = expiry[-1]
 
     obj = {}
-    obj['cardNum'] = "4530910000012345"
-    obj['expiry_month'] = "11"
-    obj['expiry_year'] = "2027"
-    obj['cvv'] = "202"
-    obj['name'] = user.name
-    obj['amount'] = "200"
-    
+    obj['cardNum'] = request.POST['cardNum']
+    obj['expiry_month'] = expiry_month
+    obj['expiry_year'] = expiry_year
+    obj['cvv'] = request.POST['cvv']
+    obj['name'] = request.POST['name']
+    obj['amount'] = request.POST['amount']
+
     client_token = generate_token(obj,token)
 
     if client_token is None:
-        return JsonResponse({'error': 'Send a post request with valid parameter only'}, status=400)
+        return JsonResponse({'error': 'Send a post request with valid parameter only!!'}, status=400)
+
+    if request.POST['remember'] == "yes":
+        save_card(obj,id)
 
     payment = make_payment(obj,token,client_token)
 
